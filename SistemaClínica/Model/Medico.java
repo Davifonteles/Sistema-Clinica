@@ -25,6 +25,15 @@ public class Medico {
         return planosAceitos;
     }
 
+    /** Compara o plano sem diferenciar maiúsculas/minúsculas nem espaços nas pontas. */
+    public boolean aceitaPlano(String plano) {
+        if (plano == null) return false;
+        for (String p : planosAceitos) {
+            if (p.trim().equalsIgnoreCase(plano.trim())) return true;
+        }
+        return false;
+    }
+
     public void setEspecialidade(String especialidade) {
         this.especialidade = especialidade;
     }

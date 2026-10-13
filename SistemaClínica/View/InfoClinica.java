@@ -36,7 +36,7 @@ public final class InfoClinica {
 
     /** Mesma verificação feita em SistemaConsultaMedica.agendarConsulta. */
     public static boolean atende(Medico m, Paciente p) {
-        return semPlano(p) || m.getPlanosAceitos().contains(p.getPlanoSaude());
+        return semPlano(p) || m.aceitaPlano(p.getPlanoSaude());
     }
 
     /** Valor cobrado de quem não tem plano (mesma tabela de SistemaConsultaMedica.realizarConsulta). */
@@ -73,6 +73,11 @@ public final class InfoClinica {
             if (x.getMedico() == m && x.getDataHora().equals(horario)) return true;
         }
         return false;
+    }
+
+    /** O paciente já tem outra consulta (com qualquer médico) nesse horário? */
+    public static boolean pacienteOcupado(SistemaController c, Paciente p, LocalDateTime horario) {
+        return c.getSistema().pacienteTemConsultaNoHorario(p, horario);
     }
 
     public static long consultasNoDia(SistemaController c, Medico m, LocalDate dia) {

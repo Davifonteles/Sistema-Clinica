@@ -88,10 +88,7 @@ public class SistemaConsultaMedica {
             boolean nomeCombina = m.getNome().toLowerCase().contains(termo);
             boolean especialidadeCombina = m.getEspecialidade().toLowerCase().contains(termo);
 
-            boolean planoAceito = planoPaciente.equals("não tenho") ||
-                    m.getPlanosAceitos().stream()
-                            .map(String::toLowerCase)
-                            .anyMatch(p -> p.equals(planoPaciente));
+            boolean planoAceito = planoPaciente.equals("não tenho") || m.aceitaPlano(planoPaciente);
 
             if ((nomeCombina || especialidadeCombina) && planoAceito) {
                 List<Integer> avaliacoes = getAvaliacoesMedico(m);
@@ -120,11 +117,14 @@ public class SistemaConsultaMedica {
 
     // AGENDAR CONSULTA 
 
-    public boolean agendarConsulta(String nomeMedico, LocalDateTime dataHora) {
-        if (pacienteLogado == null) {
-            System.out.println("Você precisa estar logado como paciente.");
-            return false;
-        }
+    public ResultadoAgendamento agendarConsulta(String nomeMedico, LocalDateTime dataHora) {
+        ResultadoAgendamento resultado = tentarAgendar(nomeMedico, dataHora);
+        System.out.println(resultado.getMensagem());
+        return resultado;
+    }
+
+    private ResultadoAgendamento tentarAgendar(String nomeMedico, LocalDateTime dataHora) {
+        if (pacienteLogado == null) return ResultadoAgendamento.NAO_LOGADO;
 
         Medico medicoSelecionado = null;
         for (Medico m : medicos) {
@@ -133,17 +133,23 @@ public class SistemaConsultaMedica {
                 break;
             }
         }
-
-        if (medicoSelecionado == null) {
-            System.out.println("Médico não encontrado.");
-            return false;
-        }
+        if (medicoSelecionado == null) return ResultadoAgendamento.MEDICO_NAO_ENCONTRADO;
 
         String plano = pacienteLogado.getPlanoSaude();
-        if (!plano.equalsIgnoreCase("não tenho") &&
-                !medicoSelecionado.getPlanosAceitos().contains(plano)) {
-            System.out.println("Este médico não aceita seu plano de saúde.");
-            return false;
+        if (!plano.equalsIgnoreCase("não tenho") && !medicoSelecionado.aceitaPlano(plano)) {
+            return ResultadoAgendamento.PLANO_NAO_ACEITO;
+        }
+
+        // o mesmo horário do médico não pode ter duas consultas
+        for (Consulta c : consultas) {
+            if (c.getMedico().equals(medicoSelecionado) && c.getDataHora().equals(dataHora)) {
+                return ResultadoAgendamento.HORARIO_OCUPADO;
+            }
+        }
+
+        // o paciente não pode estar em duas consultas ao mesmo tempo
+        if (pacienteTemConsultaNoHorario(pacienteLogado, dataHora)) {
+            return ResultadoAgendamento.PACIENTE_OCUPADO;
         }
 
         long consultasNoDia = contarConsultasDoMedicoNoDia(medicoSelecionado, dataHora);
@@ -151,14 +157,19 @@ public class SistemaConsultaMedica {
 
         if (consultasNoDia < 3) {
             consultas.add(novaConsulta);
-            System.out.println("Consulta agendada com sucesso.");
-        } else {
-            listaEspera.add(novaConsulta);
-            System.out.println("Horários do médico estão cheios neste dia.");
-            System.out.println("Você foi adicionado à lista de espera.");
+            return ResultadoAgendamento.AGENDADA;
         }
+        listaEspera.add(novaConsulta);
+        return ResultadoAgendamento.LISTA_DE_ESPERA;
+    }
 
-        return true;
+    public boolean pacienteTemConsultaNoHorario(Paciente paciente, LocalDateTime dataHora) {
+        for (Consulta c : consultas) {
+            if (c.getPaciente().equals(paciente) && !c.isRealizada() && c.getDataHora().equals(dataHora)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // CANCELAR CONSULTA 
@@ -185,7 +196,8 @@ public class SistemaConsultaMedica {
             // Verifica se há alguém na lista de espera para esse médico e dia
             for (Consulta espera : listaEspera) {
                 if (espera.getMedico().equals(medico) &&
-                    espera.getDataHora().toLocalDate().equals(horarioCancelado.toLocalDate())) {
+                    espera.getDataHora().toLocalDate().equals(horarioCancelado.toLocalDate()) &&
+                    !pacienteTemConsultaNoHorario(espera.getPaciente(), horarioCancelado)) {
 
                     // Remarca para o mesmo horário do cancelamento
                     Consulta novaConsulta = new Consulta(medico, espera.getPaciente(), horarioCancelado);
@@ -358,6 +370,19 @@ public List<Consulta> getConsultasFuturasDoPaciente() {
         }
     }
     return futuras;
+}
+
+// RETORNAR PEDIDOS NA LISTA DE ESPERA
+public List<Consulta> getListaEsperaDoPaciente() {
+    List<Consulta> lista = new ArrayList<>();
+    if (pacienteLogado == null) return lista;
+
+    for (Consulta c : listaEspera) {
+        if (c.getPaciente().equals(pacienteLogado)) {
+            lista.add(c);
+        }
+    }
+    return lista;
 }
 
 // RETORNAR CONSULTAS REALIZADAS

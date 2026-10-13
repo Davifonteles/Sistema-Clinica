@@ -16,6 +16,7 @@ import SistemaClínica.Controller.SistemaController;
 import SistemaClínica.Model.Consulta;
 import SistemaClínica.Model.Medico;
 import SistemaClínica.Model.Paciente;
+import SistemaClínica.Model.ResultadoAgendamento;
 
 /** Área do paciente: minhas consultas e agendamento. */
 public class AreaPaciente extends AreaBase {
@@ -74,6 +75,15 @@ public class AreaPaciente extends AreaBase {
             col.add(Box.createVerticalStrut(10));
         }
 
+        List<Consulta> espera = InfoClinica.ordenar(controller.getListaEsperaDoPaciente(), false);
+        if (!espera.isEmpty()) {
+            col.adicionar(Tema.secao("Na lista de espera"));
+            for (Consulta c : espera) {
+                col.adicionar(linhaEspera(c));
+                col.add(Box.createVerticalStrut(10));
+            }
+        }
+
         col.adicionar(Tema.secao("Consultas realizadas"));
         if (realizadas.isEmpty()) {
             col.adicionar(Tema.vazio("Nenhuma consulta realizada ainda",
@@ -115,6 +125,21 @@ public class AreaPaciente extends AreaBase {
         cancelar.addActionListener(e -> cancelar(c));
         direita.add(cancelar);
         card.add(centralizar(direita), BorderLayout.EAST);
+        return card;
+    }
+
+    private JComponent linhaEspera(Consulta c) {
+        Tema.Cartao card = new Tema.Cartao(new BorderLayout(16, 0));
+        card.cores(Tema.ESPERA_CLARO, new Color(0xEBCB93));
+        card.setBorder(new EmptyBorder(12, 12, 12, 18));
+        card.add(Tema.blocoData(c.getDataHora(), false), BorderLayout.WEST);
+        JPanel textos = new JPanel(new GridLayout(2, 1, 0, 2));
+        textos.setOpaque(false);
+        textos.add(Tema.rotulo(c.getMedico().getNome() + "  ·  " + c.getMedico().getEspecialidade(), Font.BOLD, 15, Tema.TEXTO));
+        textos.add(Tema.rotulo("Pediu " + c.getDataHora().format(Tema.HORA) + ". Se alguém cancelar nesse dia, a vaga é sua.",
+            Font.PLAIN, 13, Tema.ESPERA));
+        card.add(textos, BorderLayout.CENTER);
+        card.add(centralizar(Tema.Chip.espera("Aguardando vaga")), BorderLayout.EAST);
         return card;
     }
 
@@ -474,8 +499,10 @@ public class AreaPaciente extends AreaBase {
             boolean lotado = InfoClinica.consultasNoDia(controller, m, dia) >= InfoClinica.LIMITE_POR_DIA;
             for (int h : InfoClinica.HORAS) {
                 LocalDateTime horario = InfoClinica.horario(dia, h);
-                boolean ocupado = InfoClinica.ocupado(controller, m, horario);
+                boolean doPaciente = InfoClinica.pacienteOcupado(controller, paciente, horario);
+                boolean ocupado = doPaciente || InfoClinica.ocupado(controller, m, horario);
                 Horario botao = new Horario(horario.format(Tema.HORA), ocupado, lotado, horario.equals(horarioEscolhido));
+                if (doPaciente) botao.setToolTipText("Você já tem uma consulta neste horário");
                 if (!ocupado) {
                     botao.addActionListener(e -> {
                         horarioEscolhido = horario;
@@ -491,14 +518,13 @@ public class AreaPaciente extends AreaBase {
 
     private void confirmarAgendamento() {
         if (medicoEscolhido == null || horarioEscolhido == null) return;
-        int antes = InfoClinica.todas(controller).size();
-        boolean ok = controller.agendarConsulta(medicoEscolhido.getNome(), horarioEscolhido);
-        int depois = InfoClinica.todas(controller).size();
+        ResultadoAgendamento r = controller.agendarConsulta(medicoEscolhido.getNome(), horarioEscolhido);
         String quando = Tema.diaLongo(horarioEscolhido) + " às " + horarioEscolhido.format(Tema.HORA);
-        if (!ok) {
-            avisar("Não foi possível agendar com " + medicoEscolhido.getNome() + ".", TipoAviso.ERRO);
+        if (!r.deuCerto()) {
+            avisar(r.getMensagem(), TipoAviso.ERRO);
+            horarioEscolhido = null;
             atualizar();
-        } else if (depois > antes) {
+        } else if (r == ResultadoAgendamento.AGENDADA) {
             avisar("Consulta com " + medicoEscolhido.getNome() + " agendada para " + quando + ".", TipoAviso.OK);
             horarioEscolhido = null;
             abrir("consultas");

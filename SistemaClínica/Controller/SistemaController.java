@@ -5,6 +5,7 @@ import SistemaClínica.Model.ArquivoUtils;
 import SistemaClínica.Model.Consulta;
 import SistemaClínica.Model.Medico;
 import SistemaClínica.Model.Paciente;
+import SistemaClínica.Model.ResultadoAgendamento;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,7 +36,7 @@ public class SistemaController {
     }
 
     // Operações do paciente
-    public boolean agendarConsulta(String nomeMedico, LocalDateTime dataHora) {
+    public ResultadoAgendamento agendarConsulta(String nomeMedico, LocalDateTime dataHora) {
         return sistema.agendarConsulta(nomeMedico, dataHora);
     }
 
@@ -88,6 +89,10 @@ public class SistemaController {
 
     public List<Consulta> getConsultasPendentesDoMedico() {
     return sistema.getConsultasPendentesDoMedico();
+    }
+
+    public List<Consulta> getListaEsperaDoPaciente() {
+        return sistema.getListaEsperaDoPaciente();
     }
 
     public List<Consulta> getAvaliacoesRecebidas() {
