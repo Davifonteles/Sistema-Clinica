@@ -4,7 +4,10 @@ import SistemaClínica.Controller.SistemaController;
 import SistemaClínica.Model.Medico;
 import SistemaClínica.Model.Paciente;
 import SistemaClínica.Model.SistemaConsultaMedica;
-import SistemaClínica.View.TelaLogin;
+import SistemaClínica.View.JanelaPrincipal;
+
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 
 import java.util.List;
 
@@ -22,7 +25,13 @@ public class Main {
 
         SistemaController controller = new SistemaController(sistema);
 
-        // AbrIR INTERFACE
-        new TelaLogin(controller);
+        // ABRIR INTERFACE
+        try {
+            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+            UIManager.put("swing.boldMetal", Boolean.FALSE);
+        } catch (Exception ignorado) {
+            // usa o visual padrão
+        }
+        SwingUtilities.invokeLater(() -> new JanelaPrincipal(controller).setVisible(true));
     }
 }
